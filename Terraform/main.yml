@@ -1,0 +1,50 @@
+# Configure the AWS Provider
+provider "aws" {
+  version = "~> 3.0"
+  region  = "us-east-1"
+
+}
+
+#providing 3 instances for k3up
+resource "aws_instace" "k3server"{
+  count = 3
+  ami =  "ami-052efd3df9dad4825"
+  instance_type = "t2.micro"
+  vpc_security_groups_ids = ${aws_security_group.k3-sg.id}
+
+  tags{
+    Name = "k3server-${count.index}"
+  }
+  user_data = << EOF
+    #!bin/bash
+    sudo apt update
+    sudo apt -y upgrade && sudo systemctl reboot
+    curl -sfL https://get.k3s.io 
+    sudo ufw allow 6443/tcp
+    sudo ufw allow 443/tcp
+    sudo cat /var/lib/rancher/k3s/server/node-token
+
+    EOF
+}
+#security groups
+resource "aws_security_group" "k3-sg"{
+  name = "k3-secured"
+  
+  ingress = {
+    from_port = 8080
+    to_port = 8080
+    protocol = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+
+  }
+
+}
+
+resource "aws_ecr_repository" "myrepo" {
+  name                 = "noderepo"
+  image_tag_mutability = "MUTABLE"
+
+  image_scanning_configuration {
+    scan_on_push = true
+  }
+}
